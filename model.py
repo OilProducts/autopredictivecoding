@@ -1,4 +1,10 @@
+from typing import Union, Callable, Tuple, Any, Optional, Dict
+
 import torch
+import torch.nn as nn
+from torch.nn.modules.module import T
+from torch.utils.hooks import RemovableHandle
+
 
 # Each logical portion of the model needs to be an autoencoder of some sort. The latent space of the autoencoder
 # is part of its own input.  The decoder should be trained in parallel.  Two experiments come to mind, one is having the
@@ -16,7 +22,6 @@ import torch
 #   -    Output
 #  ---
 # -----  Training residual, unused except for loss calculation
-
 
 
 # The sensor should take the observation as input, and output the latent space of the autoencoder. With loss calculated
@@ -40,11 +45,61 @@ import torch
 
 
 class NeuronUnit(torch.nn.Module):
-    def __init__(self, input_size, output_size):
+    def __init__(self, loss_function=nn.MSELoss):
         super(NeuronUnit, self).__init__()
-        self.input_size = input_size
-        self.output_size = output_size
-        self.fc = torch.nn.Linear(input_size, output_size)
+
+        self.loss_function = loss_function
+        # Encoder
+        self.encoder = nn.Sequential(
+            nn.Conv2d(3, 16, 3, stride=2, padding=1),  # output: 16 x 32 x 32
+            nn.ReLU(),
+            nn.Conv2d(16, 32, 3, stride=2, padding=1),  # output: 32 x 16 x 16
+            nn.ReLU(),
+            nn.Conv2d(32, 64, 3, stride=2, padding=1),  # output: 64 x 8 x 8
+            nn.ReLU(),
+            nn.Conv2d(64, 128, 3, stride=2, padding=1),  # output: 128 x 4 x 4
+            nn.ReLU(),
+            nn.Flatten(),  # output: 2048
+            nn.Linear(2048, 256),  # output: 256 (encoded space)
+            nn.ReLU()
+        )
+
+        # Decoder
+        self.decoder = nn.Sequential(
+            nn.Linear(256, 2048),  # output: 2048
+            nn.ReLU(),
+            nn.Unflatten(1, (128, 4, 4)),  # output: 128 x 4 x 4
+            nn.ConvTranspose2d(128, 64, 3, stride=2, padding=1, output_padding=1),
+            # output: 64 x 8 x 8
+            nn.ReLU(),
+            nn.ConvTranspose2d(64, 32, 3, stride=2, padding=1, output_padding=1),
+            # output: 32 x 16 x 16
+            nn.ReLU(),
+            nn.ConvTranspose2d(32, 16, 3, stride=2, padding=1, output_padding=1),
+            # output: 16 x 32 x 32
+            nn.ReLU(),
+            nn.ConvTranspose2d(16, 3, 3, stride=2, padding=1, output_padding=1),
+            # output: 3 x 64 x 64
+            nn.Sigmoid()  # Using Sigmoid to scale the output between 0 and 1
+        )
+
+        self.training_residual = None
+
+        # self.fc = torch.nn.Linear(input_size, output_size)
+
+    def forward(self, x):
+        output = self.encoder(x)
+        training_residual = self.decoder(output)
+        return output, training_residual
+
+
+class MiniColumn(torch.nn.Module):
+    def __init__(self, input, output):
+        super(MiniColumn, self).__init__()
+        self.fc = torch.nn.Linear(input, output)
 
     def forward(self, x):
         return self.fc(x)
+
+
+
