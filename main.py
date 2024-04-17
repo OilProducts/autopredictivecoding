@@ -1,5 +1,6 @@
 import argparse
 
+import torch
 import tqdm
 
 import gymnasium as gym
@@ -39,6 +40,25 @@ done = True
 step = 0
 bar = tqdm.tqdm(total=args.steps, smoothing=0)
 observation, _, terminated, truncated, _ = env.step(action_space.sample())
+
+n_episodes = 500
+
+for episode in range(n_episodes):
+    state = env.reset()
+    done = False
+    while not done:
+        state = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(device)
+        action_probs = actor(state)
+        dist = Categorical(action_probs)
+        action = dist.sample()
+
+        next_state, reward, done, _ = env.step(action.cpu().numpy())
+        actor_loss, critic_loss = ppo_update(state, action, dist.log_prob(action), reward, next_state, done)
+
+        state = next_state
+
+
+
 
 while step < args.steps or not done:
     if done:

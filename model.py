@@ -2,6 +2,7 @@ from typing import Union, Callable, Tuple, Any, Optional, Dict
 
 import torch
 import torch.nn as nn
+import torch.optim as optim
 from torch.nn.modules.module import T
 from torch.utils.hooks import RemovableHandle
 
@@ -43,63 +44,16 @@ from torch.utils.hooks import RemovableHandle
 
 # Motor units should take the latent space as input, and output the action space
 
-
-class NeuronUnit(torch.nn.Module):
-    def __init__(self, loss_function=nn.MSELoss):
-        super(NeuronUnit, self).__init__()
-
-        self.loss_function = loss_function
-        # Encoder
-        self.encoder = nn.Sequential(
-            nn.Conv2d(3, 16, 3, stride=2, padding=1),  # output: 16 x 32 x 32
-            nn.ReLU(),
-            nn.Conv2d(16, 32, 3, stride=2, padding=1),  # output: 32 x 16 x 16
-            nn.ReLU(),
-            nn.Conv2d(32, 64, 3, stride=2, padding=1),  # output: 64 x 8 x 8
-            nn.ReLU(),
-            nn.Conv2d(64, 128, 3, stride=2, padding=1),  # output: 128 x 4 x 4
-            nn.ReLU(),
-            nn.Flatten(),  # output: 2048
-            nn.Linear(2048, 256),  # output: 256 (encoded space)
-            nn.ReLU()
-        )
-
-        # Decoder
-        self.decoder = nn.Sequential(
-            nn.Linear(256, 2048),  # output: 2048
-            nn.ReLU(),
-            nn.Unflatten(1, (128, 4, 4)),  # output: 128 x 4 x 4
-            nn.ConvTranspose2d(128, 64, 3, stride=2, padding=1, output_padding=1),
-            # output: 64 x 8 x 8
-            nn.ReLU(),
-            nn.ConvTranspose2d(64, 32, 3, stride=2, padding=1, output_padding=1),
-            # output: 32 x 16 x 16
-            nn.ReLU(),
-            nn.ConvTranspose2d(32, 16, 3, stride=2, padding=1, output_padding=1),
-            # output: 16 x 32 x 32
-            nn.ReLU(),
-            nn.ConvTranspose2d(16, 3, 3, stride=2, padding=1, output_padding=1),
-            # output: 3 x 64 x 64
-            nn.Sigmoid()  # Using Sigmoid to scale the output between 0 and 1
-        )
-
-        self.training_residual = None
-
-        # self.fc = torch.nn.Linear(input_size, output_size)
+import sensor, minicolumn, motor_unit
+class Brain:
+    def __init__(self):
+        self.sensor = sensor.Sensor()
+        self.mini_column = minicolumn.MiniColumn(256, 64)
+        self.motor_unit = motor_unit.DecisionUnit(320, 17)
 
     def forward(self, x):
-        output = self.encoder(x)
-        training_residual = self.decoder(output)
-        return output, training_residual
-
-
-class MiniColumn(torch.nn.Module):
-    def __init__(self, input, output):
-        super(MiniColumn, self).__init__()
-        self.fc = torch.nn.Linear(input, output)
-
-    def forward(self, x):
-        return self.fc(x)
-
-
-
+        sensor_output, sensor_residual = self.sensor(x)
+        mini_column_output, mini_column_residual = self.mini_column(sensor_output)
+        state = torch.cat((sensor_output, mini_column_output), 1)
+        motor_output = self.motor_unit(state)
+        return sensor_output, sensor_residual, mini_column_output, mini_column_residual, motor_output
