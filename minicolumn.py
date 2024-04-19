@@ -8,11 +8,13 @@ class MiniColumn(nn.Module):
         self.in_size = in_size
         self.latent_size = latent_size
         self.loss_function = loss_function
-        self.optimizer = optim.Adam(self.parameters(), lr=0.001)
         self.training_residual = None
 
         self.encoder = nn.Linear(self.in_size, self.latent_size)
         self.decoder = nn.Linear(self.latent_size, self.in_size)
+
+        self.optimizer = optim.Adam(self.parameters(), lr=0.001)
+
 
     # def step(self, x):
     #     self.previous_input = x

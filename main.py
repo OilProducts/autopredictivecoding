@@ -1,6 +1,8 @@
 import argparse
 
 import torch
+from torch.distributions import Categorical
+
 import tqdm
 
 import gymnasium as gym
@@ -34,12 +36,14 @@ env = crafter.Recorder(
 )
 action_space = env.action_space
 
-model = model.NeuronUnit()
+model = model.Brain()
 
 done = True
 step = 0
 bar = tqdm.tqdm(total=args.steps, smoothing=0)
-observation, _, terminated, truncated, _ = env.step(action_space.sample())
+# state = env.reset()
+#
+# observation, _, terminated, truncated, _ = env.step(action_space.sample())
 
 n_episodes = 500
 
@@ -47,18 +51,18 @@ for episode in range(n_episodes):
     state = env.reset()
     done = False
     while not done:
-        state = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(device)
-        action_probs = actor(state)
+        state = torch.tensor(state[0], dtype=torch.float32).unsqueeze(0)
+        _, _, _, _, action_probs = model(state.permute(0, 3, 1, 2))
+        # action_probs = model.motor_unit.actor(state)
         dist = Categorical(action_probs)
         action = dist.sample()
 
-        next_state, reward, done, _ = env.step(action.cpu().numpy())
-        actor_loss, critic_loss = ppo_update(state, action, dist.log_prob(action), reward, next_state, done)
+        next_state, reward, terminated, truncated, info = env.step(action)
+        done = truncated or terminated
+        actor_loss, critic_loss = model.motor_unit.ppo_update(model.latent_state, action, dist.log_prob(action),
+                                                              reward, next_state, done)
 
         state = next_state
-
-
-
 
 while step < args.steps or not done:
     if done:
@@ -73,4 +77,3 @@ while step < args.steps or not done:
     done = terminated or truncated
     step += 1
     bar.update(1)
-

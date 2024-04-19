@@ -4,9 +4,8 @@ import torch.optim as optim
 
 class Sensor(nn.Module):
     def __init__(self, loss_function=nn.MSELoss):
-        super(NeuronUnit, self).__init__()
+        super(Sensor, self).__init__()
         self.loss_function = loss_function
-        self.optimizer = optim.Adam(self.parameters(), lr=0.001)
         self.training_residual = None
 
         # Encoder
@@ -43,6 +42,7 @@ class Sensor(nn.Module):
             nn.Sigmoid()  # Using Sigmoid to scale the output between 0 and 1
         )
 
+        self.optimizer = optim.Adam(self.parameters(), lr=0.001)
 
         # self.fc = torch.nn.Linear(input_size, output_size)
 

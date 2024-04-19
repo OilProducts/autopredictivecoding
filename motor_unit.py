@@ -38,8 +38,9 @@ class Critic(nn.Module):
         return self.network(state)
 
 
-class DecisionUnit:
+class DecisionUnit(nn.Module):
     def __init__(self, input_size, action_space):
+        super(DecisionUnit, self).__init__()
         self.actor = Actor()
         self.critic = Critic()
         self.optimizer = optim.Adam(self.actor.parameters(), lr=0.001)
@@ -51,6 +52,9 @@ class DecisionUnit:
         self.eps_clip = 0.2
         self.K_epochs = 4
 
+    def forward(self, latent_state):
+        return self.actor(latent_state)
+
     def ppo_update(self, states, actions, log_probs, rewards, next_states, done_flags,
                    clip_param=0.2):
         rewards = torch.tensor(rewards, dtype=torch.float32)
@@ -58,7 +62,8 @@ class DecisionUnit:
         actions = torch.tensor(actions)
 
         # Normalize rewards
-        rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
+        print(f'rewards: {rewards}, rewards.mean(): {rewards.mean()}, rewards.std(): {rewards.std()}')
+        rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-2)
 
         for _ in range(self.K_epochs):
             # Evaluating old actions and values
