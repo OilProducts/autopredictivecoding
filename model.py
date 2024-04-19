@@ -45,15 +45,17 @@ from torch.utils.hooks import RemovableHandle
 # Motor units should take the latent space as input, and output the action space
 
 import sensor, minicolumn, motor_unit
-class Brain:
+class Brain(nn.Module):
     def __init__(self):
+        super(Brain, self).__init__()
         self.sensor = sensor.Sensor()
         self.mini_column = minicolumn.MiniColumn(256, 64)
         self.motor_unit = motor_unit.DecisionUnit(320, 17)
+        self.latent_state = None
 
     def forward(self, x):
         sensor_output, sensor_residual = self.sensor(x)
         mini_column_output, mini_column_residual = self.mini_column(sensor_output)
-        state = torch.cat((sensor_output, mini_column_output), 1)
-        motor_output = self.motor_unit(state)
+        self.latent_state = torch.cat((sensor_output, mini_column_output), 1)
+        motor_output = self.motor_unit(self.latent_state)
         return sensor_output, sensor_residual, mini_column_output, mini_column_residual, motor_output
