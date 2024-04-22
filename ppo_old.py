@@ -100,10 +100,10 @@ class PPO(nn.Module):
     def train_net(self):
         # Training the model using the collected batch data
         s, a, r, s_prime, done, old_log_pi = self.make_batch()
-        print(f'reward: {r}')
-        print(f's: {s.shape}, a: {a.shape}, r: {r.shape}, s_prime: {s_prime.shape}, done: {done.shape}, old_log_pi: {old_log_pi.shape}')
+        # print(f'reward: {r}')
+        # print(f's: {s.shape}, a: {a.shape}, r: {r.shape}, s_prime: {s_prime.shape}, done: {done.shape}, old_log_pi: {old_log_pi.shape}')
         td_target = r + gamma * self.v(s_prime) * (1 - done)
-        print(f'td_target: {td_target}')
+        # print(f'td_target: {td_target}')
         delta = td_target - self.v(s)  # Compute delta for advantage estimation
 
         advantage_lst = []
@@ -157,10 +157,13 @@ def main():
                 m = torch.distributions.Categorical(prob)
                 a = m.sample()
                 prob_a = torch.log(prob.squeeze(0)[a]).item()  # Log probability of the action taken
+
+                # ------------- step here -------------
                 s_prime, r, term, trunc, info = env.step(a.item())
                 s_prime = torch.from_numpy(s_prime).float().to(device)
                 done = term or trunc
 
+                # last_state, current_action, current_reward, current_state, done, log_prob
                 model.put_data((s.cpu().numpy(), a, r / 100.0, s_prime.cpu().numpy(), done),
                                prob_a)  #
                 # Store data
