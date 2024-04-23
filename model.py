@@ -44,26 +44,41 @@ from torch.utils.hooks import RemovableHandle
 
 # Motor units should take the latent space as input, and output the action space
 
-import sensor, minicolumn, motor_unit, ppo
+import sensor, minicolumn, motor_unit, ppo, decision
 class Brain(nn.Module):
     def __init__(self, in_sz, out_sz):
         super(Brain, self).__init__()
-        self.sensor = sensor.Sensor()
-        self.mini_column = minicolumn.MiniColumn(256, 64)
-        self.motor_unit = ppo.PPO(320, 7)
+        self.sensor = sensor.SensorAtari()
+        self.mini_column1 = minicolumn.MiniColumn(256, 64)
+        self.mini_column2 = minicolumn.MiniColumn(320, 64)
+        self.motor_unit = decision.PPOSplit(384, out_sz)
         self.latent_state = None
 
     def forward(self, x, reward, done):
         sensor_output, sensor_residual = self.sensor(x)
-        mini_column_output, mini_column_residual = self.mini_column(sensor_output)
-        self.latent_state = torch.cat((sensor_output, mini_column_output), 1)
+        sensor_output = sensor_output.squeeze()
+        mini_column1_output, mini_column1_residual = self.mini_column1.initial_step(sensor_output)
+        mini_column1_output = mini_column1_output.squeeze()
+
+        mini_column2_output, mini_column2_residual = self.mini_column2.initial_step(
+            torch.cat((sensor_output, mini_column1_output), 0))
+        mini_column2_output = mini_column2_output.squeeze()
+
+        self.latent_state = torch.cat((sensor_output, mini_column1_output, mini_column2_output), 0)
         motor_output = self.motor_unit.act_and_train(self.latent_state, reward, done)
-        return sensor_output, sensor_residual, mini_column_output, mini_column_residual, motor_output
+        return motor_output
 
     def initial_action(self, x):
         sensor_output, sensor_residual = self.sensor(x)
-        mini_column_output, mini_column_residual = self.mini_column(sensor_output)
-        self.latent_state = torch.cat((sensor_output, mini_column_output), 1)
+        sensor_output = sensor_output.squeeze()
+        mini_column1_output, mini_column1_residual = self.mini_column1.initial_step(sensor_output)
+        mini_column1_output = mini_column1_output.squeeze()
+
+        mini_column2_output, mini_column2_residual = self.mini_column2.initial_step(
+            torch.cat((sensor_output, mini_column1_output), 0))
+        mini_column2_output = mini_column2_output.squeeze()
+
+        self.latent_state = torch.cat((sensor_output, mini_column1_output, mini_column2_output), 0)
         motor_output = self.motor_unit.act(self.latent_state)
         return motor_output
 

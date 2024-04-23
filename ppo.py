@@ -20,8 +20,8 @@ print(f'Using device: {device}')
 
 # Hyperparameters
 learning_rate = 5e-4  # Learning rate for optimizer
-gamma = 0.99  # Discount factor for future rewards
-lmbda = 0.9  # Lambda for GAE-Lambda
+gamma = 0.98  # Discount factor for future rewards
+lmbda = 0.95  # Lambda for GAE-Lambda
 eps_clip = 0.1  # Clipping epsilon for PPO's loss
 K_epoch = 3  # Number of epochs for optimization
 T_horizon = 100000  # Horizon (batch size) for collecting data per policy update
@@ -31,11 +31,11 @@ T_horizon = 100000  # Horizon (batch size) for collecting data per policy update
 class PPO(nn.Module):
     def __init__(self, in_dim, out_dim,
                  lr=1e-4,
-                 gamma=0.99,
-                 lmbda=0.9,
+                 gamma=0.98,
+                 lmbda=0.95,
                  eps_clip=0.1,
                  K_epoch=3,
-                 T_horizon=500,
+                 T_horizon=1000,
                  device='cpu'):
         super(PPO, self).__init__()
         self.last_log_prob = None
@@ -150,7 +150,7 @@ class PPO(nn.Module):
     def act_and_train(self, state, reward, done):
         self.put_data((self.last_s,
                        self.last_a,
-                       reward / 100,
+                       reward * 10,
                        state.cpu().numpy(),
                        done,
                        self.last_log_prob))

@@ -6,6 +6,7 @@ from torch.distributions import Categorical
 import tqdm
 
 import gymnasium as gym
+from gymnasium.utils.save_video import save_video
 # import crafter
 
 import model
@@ -47,12 +48,15 @@ seed = args.seed
 
 n_episodes = 500
 
+
 def main():
-    env = gym.make("ALE/Assault-v5", render_mode='rgb_array_list')  # Create the game environment
-    brain = model.Brain(210*160*3, 7)
+    env = gym.make("ALE/Breakout-v5", render_mode='rgb_array_list')  # Create the game environment
+    brain = model.Brain(210 * 160 * 3, 4)
     total_score = 0.0
+    total_steps = 0
 
     for episode in range(n_episodes):
+        steps = 0
         start_time = time.time()
         state, _ = env.reset()
         brain.reset()
@@ -62,21 +66,41 @@ def main():
         action = brain.initial_action(state)
 
         state, reward, terminated, truncated, _ = env.step(action)
-        state = torch.from_numpy(state).float().permute(0, 3, 1, 2)
+        total_steps += 1
+        steps += 1
+        state = torch.from_numpy(state).float().permute(2, 0, 1).unsqueeze(0)
 
         done = False
         score = 0.0
         while not done:
             action = brain(state, reward, done)
             state, reward, terminated, truncated, _ = env.step(action)
-            state = torch.from_numpy(state).float().permute(0, 3, 1, 2)
+            total_steps += 1
+            steps += 1
+            state = torch.from_numpy(state).float().permute(2, 0, 1).unsqueeze(0)
             done = terminated or truncated
             score += reward
         action = brain(state, reward, done)
 
         end_time = time.time()
         total_score += score
-        print(f'Episode {episode} finished in {end_time - start_time:.2f} seconds, score: {score:.1f}')
+        print(
+            f'Episode {episode} finished in {end_time - start_time:.2f} seconds and {steps} steps, '
+            f'score: {score:.1f}, total steps: {total_steps}')
+
+        if score > 20:
+            save_video(env.render(),
+                       "videos",
+                       fps=30,
+                       episode_trigger=lambda episode_id: True,
+                       step_starting_index=0,
+                       episode_index=episode, )
+
+        save_video(env.render(),
+                   "videos",
+                   fps=30,
+                   step_starting_index=0,
+                   episode_index=episode, )
 
     env.close()
     # while step < args.steps or not done:
