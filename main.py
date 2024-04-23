@@ -1,12 +1,12 @@
 import argparse
-
+import time
 import torch
 from torch.distributions import Categorical
 
 import tqdm
 
 import gymnasium as gym
-import crafter
+# import crafter
 
 import model
 
@@ -26,54 +26,73 @@ seed = args.seed
 #   save_video=False,
 #   save_episode=False,
 # )
-
-env = crafter.Env()
-env = crafter.Recorder(
-    env, args.outdir,
-    save_stats=True,
-    save_episode=False,
-    save_video=False,
-)
-action_space = env.action_space
-
-model = model.Brain()
-
-done = True
-step = 0
-bar = tqdm.tqdm(total=args.steps, smoothing=0)
+#
+# env = crafter.Env()
+# env = crafter.Recorder(
+#     env, args.outdir,
+#     save_stats=True,
+#     save_episode=False,
+#     save_video=False,
+# )
+# action_space = env.action_space
+#
+# # model = model.Brain()
+#
+# done = True
+# step = 0
+# bar = tqdm.tqdm(total=args.steps, smoothing=0)
 # state = env.reset()
 #
 # observation, _, terminated, truncated, _ = env.step(action_space.sample())
 
 n_episodes = 500
 
-for episode in range(n_episodes):
-    state = env.reset()
-    done = False
-    while not done:
-        state = torch.tensor(state[0], dtype=torch.float32).unsqueeze(0)
-        _, _, _, _, action_probs = model(state.permute(0, 3, 1, 2))
-        # action_probs = model.motor_unit.actor(state)
-        dist = Categorical(action_probs)
-        action = dist.sample()
+def main():
+    env = gym.make("ALE/Assault-v5", render_mode='rgb_array_list')  # Create the game environment
+    brain = model.Brain(210*160*3, 7)
+    total_score = 0.0
 
-        next_state, reward, terminated, truncated, info = env.step(action)
-        done = truncated or terminated
-        actor_loss, critic_loss = model.motor_unit.ppo_update(model.latent_state, action, dist.log_prob(action),
-                                                              reward, next_state, done)
+    for episode in range(n_episodes):
+        start_time = time.time()
+        state, _ = env.reset()
+        brain.reset()
+        state = torch.from_numpy(state).float().permute(2, 0, 1).unsqueeze(0)
 
-        state = next_state
+        # First round, so we don't end up storing the initial state along with 0 reward
+        action = brain.initial_action(state)
 
-while step < args.steps or not done:
-    if done:
-        seed = hash(seed) % (2 ** 31 - 1)
-        env.reset(seed)
+        state, reward, terminated, truncated, _ = env.step(action)
+        state = torch.from_numpy(state).float().permute(0, 3, 1, 2)
+
         done = False
-    action = model(observation)
+        score = 0.0
+        while not done:
+            action = brain(state, reward, done)
+            state, reward, terminated, truncated, _ = env.step(action)
+            state = torch.from_numpy(state).float().permute(0, 3, 1, 2)
+            done = terminated or truncated
+            score += reward
+        action = brain(state, reward, done)
 
-    sensor = model.encoder(observation)
+        end_time = time.time()
+        total_score += score
+        print(f'Episode {episode} finished in {end_time - start_time:.2f} seconds, score: {score:.1f}')
 
-    _, _, terminated, truncated, _ = env.step(action_space.sample())
-    done = terminated or truncated
-    step += 1
-    bar.update(1)
+    env.close()
+    # while step < args.steps or not done:
+    #     if done:
+    #         seed = hash(seed) % (2 ** 31 - 1)
+    #         env.reset(seed)
+    #         done = False
+    #     action = model(observation)
+    #
+    #     sensor = model.encoder(observation)
+    #
+    #     _, _, terminated, truncated, _ = env.step(action_space.sample())
+    #     done = terminated or truncated
+    #     step += 1
+    #     bar.update(1)
+
+
+if __name__ == '__main__':
+    main()

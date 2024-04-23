@@ -44,18 +44,31 @@ from torch.utils.hooks import RemovableHandle
 
 # Motor units should take the latent space as input, and output the action space
 
-import sensor, minicolumn, motor_unit
+import sensor, minicolumn, motor_unit, ppo
 class Brain(nn.Module):
-    def __init__(self):
+    def __init__(self, in_sz, out_sz):
         super(Brain, self).__init__()
         self.sensor = sensor.Sensor()
         self.mini_column = minicolumn.MiniColumn(256, 64)
-        self.motor_unit = motor_unit.DecisionUnit(320, 17)
+        self.motor_unit = ppo.PPO(320, 7)
         self.latent_state = None
 
-    def forward(self, x):
+    def forward(self, x, reward, done):
         sensor_output, sensor_residual = self.sensor(x)
         mini_column_output, mini_column_residual = self.mini_column(sensor_output)
         self.latent_state = torch.cat((sensor_output, mini_column_output), 1)
-        motor_output = self.motor_unit(self.latent_state)
+        motor_output = self.motor_unit.act_and_train(self.latent_state, reward, done)
         return sensor_output, sensor_residual, mini_column_output, mini_column_residual, motor_output
+
+    def initial_action(self, x):
+        sensor_output, sensor_residual = self.sensor(x)
+        mini_column_output, mini_column_residual = self.mini_column(sensor_output)
+        self.latent_state = torch.cat((sensor_output, mini_column_output), 1)
+        motor_output = self.motor_unit.act(self.latent_state)
+        return motor_output
+
+    def reset(self):
+        # self.sensor.reset()
+        # self.mini_column.reset()
+        self.motor_unit.reset()
+        self.latent_state = None

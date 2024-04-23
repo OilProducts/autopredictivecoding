@@ -22,15 +22,21 @@ print(f'Using device: {device}')
 learning_rate = 5e-4  # Learning rate for optimizer
 gamma = 0.99  # Discount factor for future rewards
 lmbda = 0.9  # Lambda for GAE-Lambda
-eps_clip = 0.2  # Clipping epsilon for PPO's loss
+eps_clip = 0.1  # Clipping epsilon for PPO's loss
 K_epoch = 3  # Number of epochs for optimization
 T_horizon = 100000  # Horizon (batch size) for collecting data per policy update
 
 
 # Policy Network
 class PPO(nn.Module):
-    def __init__(self, in_dim, out_dim, lr, gamma, lmbda, eps_clip, K_epoch, T_horizon,
-                 device):
+    def __init__(self, in_dim, out_dim,
+                 lr=1e-4,
+                 gamma=0.99,
+                 lmbda=0.9,
+                 eps_clip=0.1,
+                 K_epoch=3,
+                 T_horizon=500,
+                 device='cpu'):
         super(PPO, self).__init__()
         self.last_log_prob = None
         self.in_dim = in_dim
@@ -191,8 +197,8 @@ def main():
     current_best_score = -np.inf
     print_interval = 20
 
-    for n_epi in range(1000):
-        start_time = time.time()
+    start_time = time.time()
+    for n_epi in range(10000):
         state, _ = env.reset()
         model.reset()  # Reset model state tracking
         state = torch.from_numpy(state).float().to(device)
@@ -215,11 +221,13 @@ def main():
 
         end_time = time.time()
         total_score += score
-        # print(
-        #     f'Episode {n_epi} finished in {end_time - start_time:.2f} seconds, score: {score:.1f}')
+        # print(f'Episode {n_epi} finished in {end_time - start_time:.2f} seconds, score: {score:.1f}')
         if n_epi % print_interval == 0 and n_epi != 0:
-            print(
-                "# of episode :{}, avg score : {:.1f}".format(n_epi, total_score / print_interval))
+            end_time = time.time()
+
+            print(f'Episode {n_epi - print_interval} - {n_epi} finished in '
+                  f'{end_time - start_time:.2f} seconds, avg score: {total_score / print_interval:.1f}')
+            start_time = time.time()
             total_score = 0.0
 
     env.close()
@@ -230,9 +238,10 @@ def run():
 
 
 if __name__ == '__main__':
-    profiler = cProfile.Profile()
-    profiler.enable()
+    # profiler = cProfile.Profile()
+    # profiler.enable()
+    # run()
+    # profiler.disable()
+    # stats = pstats.Stats(profiler).sort_stats('cumtime')
+    # stats.print_stats()
     run()
-    profiler.disable()
-    stats = pstats.Stats(profiler).sort_stats('cumtime')
-    stats.print_stats()
