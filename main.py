@@ -46,7 +46,7 @@ seed = args.seed
 #
 # observation, _, terminated, truncated, _ = env.step(action_space.sample())
 
-n_episodes = 500
+n_episodes = 50000
 
 
 def main():
@@ -54,6 +54,7 @@ def main():
     brain = model.Brain(210 * 160 * 3, 4)
     total_score = 0.0
     total_steps = 0
+    highest_score = 0.0
 
     for episode in range(n_episodes):
         steps = 0
@@ -88,19 +89,24 @@ def main():
             f'Episode {episode} finished in {end_time - start_time:.2f} seconds and {steps} steps, '
             f'score: {score:.1f}, total steps: {total_steps}')
 
-        if score > 20:
+        if score > highest_score:
             save_video(env.render(),
                        "videos",
                        fps=30,
                        episode_trigger=lambda episode_id: True,
                        step_starting_index=0,
                        episode_index=episode, )
+            highest_score = score
 
-        save_video(env.render(),
-                   "videos",
-                   fps=30,
-                   step_starting_index=0,
-                   episode_index=episode, )
+        try:
+            save_video(env.render(),
+                       "videos",
+                       fps=30,
+                       step_starting_index=0,
+                       episode_index=episode, )
+        except Exception as e:
+            print(f'Error saving video: {e}')
+
 
     env.close()
     # while step < args.steps or not done:
