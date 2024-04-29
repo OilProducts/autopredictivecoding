@@ -49,9 +49,9 @@ class Brain(nn.Module):
     def __init__(self, in_sz, out_sz):
         super(Brain, self).__init__()
         self.sensor = sensor.SensorAtari()
-        self.mini_column1 = minicolumn.MiniColumn(256, 64)
-        self.mini_column2 = minicolumn.MiniColumn(320, 64)
-        self.motor_unit = decision.PPOSplit(384, out_sz)
+        self.mini_column1 = minicolumn.MiniColumn(512, 192)
+        self.mini_column2 = minicolumn.MiniColumn(704, 192)
+        self.motor_unit = decision.PPOSplit(896, out_sz)
         self.latent_state = None
 
     def forward(self, x, reward, done):

@@ -11,58 +11,55 @@ class SensorAtari(nn.Module):
         self.training_residual = None
 
         # Encoder
-        self.enc_conv1 = nn.Conv2d(3, 4, 7, stride=2, padding=1)
-        self.enc_bn1 = nn.BatchNorm2d(4)  # BatchNorm layer
+        self.enc_conv1 = nn.Conv2d(3, 32, 8, stride=4, padding=0)  # Larger stride
         self.enc_relu1 = nn.ReLU()
-        self.enc_conv2 = nn.Conv2d(4, 8, 3, stride=2, padding=1)
-        self.enc_bn2 = nn.BatchNorm2d(8)  # BatchNorm layer
+        self.enc_bn1 = nn.BatchNorm2d(32)
+
+        self.enc_conv2 = nn.Conv2d(32, 64, 4, stride=2,
+                                   padding=0)  # Reduced layers and changed kernel size
         self.enc_relu2 = nn.ReLU()
-        self.enc_conv3 = nn.Conv2d(8, 12, 3, stride=2, padding=1)
-        self.enc_bn3 = nn.BatchNorm2d(12)  # BatchNorm layer
+        self.enc_bn2 = nn.BatchNorm2d(64)
+
+        self.enc_conv3 = nn.Conv2d(64, 64, 3, stride=1, padding=0)  # Reduced layers and changed kernel size
         self.enc_relu3 = nn.ReLU()
-        self.enc_conv4 = nn.Conv2d(12, 16, 3, stride=2, padding=1)
-        self.enc_bn4 = nn.BatchNorm2d(16)  # BatchNorm layer
-        self.enc_relu4 = nn.ReLU()
+        self.enc_bn3 = nn.BatchNorm2d(64)
+
         self.enc_flatten = nn.Flatten()
-        self.enc_fc1 = nn.Linear(2080, 256)
-        self.enc_relu5 = nn.ReLU()
+        self.enc_fc1 = nn.Linear(22528, 512)  # Adjusted for the output of the last conv layer
+        self.enc_relu4 = nn.ReLU()
 
         # Decoder
-        self.dec_fc1 = nn.Linear(256, 2080)
+        self.dec_fc1 = nn.Linear(512, 22528)
         self.dec_relu1 = nn.ReLU()
-        self.dec_unflatten = nn.Unflatten(1, (16, 13, 10))
-        self.dec_deconv1 = nn.ConvTranspose2d(16, 12, 3, stride=2, padding=1, output_padding=1)
-        self.dec_bn1 = nn.BatchNorm2d(12)  # BatchNorm layer
+        self.dec_unflatten = nn.Unflatten(1, (64, 22, 16))
+
+        self.dec_deconv1 = nn.ConvTranspose2d(64, 64, 3, stride=1, padding=0, output_padding=0)
         self.dec_relu2 = nn.ReLU()
-        self.dec_deconv2 = nn.ConvTranspose2d(12, 8, 3, stride=2, padding=1, output_padding=(1,0))
-        self.dec_bn2 = nn.BatchNorm2d(8)  # BatchNorm layer
+        self.dec_bn1 = nn.BatchNorm2d(64)
+
+        self.dec_deconv2 = nn.ConvTranspose2d(64, 32, 4, stride=2, padding=0, output_padding=1)
+        self.dec_bn2 = nn.BatchNorm2d(32)
         self.dec_relu3 = nn.ReLU()
-        self.dec_deconv3 = nn.ConvTranspose2d(8, 4, 3, stride=2, padding=1, output_padding=(0,1))
-        self.dec_bn3 = nn.BatchNorm2d(4)  # BatchNorm layer
-        self.dec_relu4 = nn.ReLU()
-        self.dec_deconv4 = nn.ConvTranspose2d(4, 3, 7, stride=2, padding=1, output_padding=1)
-        self.dec_bn4 = nn.BatchNorm2d(3)  # BatchNorm layer
-        self.dec_relu5 = nn.ReLU()
+
+        self.dec_deconv3 = nn.ConvTranspose2d(32, 3, 8, stride=4, padding=0, output_padding=(2,0))
+        self.dec_bn3 = nn.BatchNorm2d(3)
+        self.dec_relu3 = nn.ReLU()
 
         # Optimizer
         self.optimizer = optim.Adam(self.parameters(), lr=1e-4)
 
-    def forward(self, x):
-        y = self.enc_bn1(self.enc_relu1(self.enc_conv1(x)))
-        y = self.enc_bn2(self.enc_relu2(self.enc_conv2(y)))
-        y = self.enc_bn3(self.enc_relu3(self.enc_conv3(y)))
-        y = self.enc_bn4(self.enc_relu4(self.enc_conv4(y)))
+    def forward(self, x):  # input is 3 x 210 x 160
+        y = self.enc_bn1(self.enc_relu1(self.enc_conv1(x)))  # 32 x 51 x 39
+        y = self.enc_bn2(self.enc_relu2(self.enc_conv2(y)))  # 64 x 24 x 18
+        y = self.enc_bn3(self.enc_relu3(self.enc_conv3(y)))  # 64 x 22 x 16
         y = self.enc_flatten(y)
-        output = self.enc_relu5(self.enc_fc1(y))
+        output = self.enc_relu4(self.enc_fc1(y))
 
         z = self.dec_relu1(self.dec_fc1(output))
-        z = self.dec_unflatten(z)
-        z = self.dec_bn1(self.dec_relu2(self.dec_deconv1(z)))
+        z = self.dec_unflatten(z)  # 64 x 22 x 16
+        z = self.dec_bn1(self.dec_relu2(self.dec_deconv1(z)))  # 64 x 20 x 14
         z = self.dec_bn2(self.dec_relu3(self.dec_deconv2(z)))
-        z = self.dec_bn3(self.dec_relu4(self.dec_deconv3(z)))
-        z = self.dec_bn4(self.dec_relu5(self.dec_deconv4(z)))
-
-        self.training_residual = z
+        self.training_residual = self.dec_bn3(self.dec_relu3(self.dec_deconv3(z)))
 
         self.optimizer.zero_grad()
         loss = self.loss_function(self.training_residual, x)

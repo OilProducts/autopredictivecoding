@@ -50,8 +50,8 @@ n_episodes = 50000
 
 
 def main():
-    env = gym.make("ALE/Breakout-v5", render_mode='rgb_array_list')  # Create the game environment
-    brain = model.Brain(210 * 160 * 3, 4)
+    env = gym.make("ALE/Pong-v5", render_mode='rgb_array_list')  # Create the game environment
+    brain = model.Brain(210 * 160 * 3, 6)
     total_score = 0.0
     total_steps = 0
     highest_score = 0.0
