@@ -1,6 +1,7 @@
 import argparse
 import time
 import torch
+from torchvision.utils import save_image
 from torch.distributions import Categorical
 
 import tqdm
@@ -81,6 +82,15 @@ def main():
             state = torch.from_numpy(state).float().permute(2, 0, 1).unsqueeze(0)
             done = terminated or truncated
             score += reward
+            if total_steps % 100 == 0:
+                print(f'Saving image at step {total_steps}')
+                reconstructed = brain.sensor.decoder(brain.sensor.latent_state)
+                print(f'Sensor loss: {brain.sensor.loss}')
+
+                # Save image of reconstructed state
+                save_image(reconstructed, f"images/reconstructed_{total_steps}.png")
+
+
         action = brain(state, reward, done)
 
         end_time = time.time()
@@ -88,6 +98,9 @@ def main():
         print(
             f'Episode {episode} finished in {end_time - start_time:.2f} seconds and {steps} steps, '
             f'score: {score:.1f}, total steps: {total_steps}')
+
+
+
 
         if score > highest_score:
             save_video(env.render(),
